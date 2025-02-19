@@ -1,10 +1,9 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Download, Link, Video, X } from "lucide-react";
+import { Download, Link, X } from "lucide-react";
 
 interface VideoItem {
   id: string;
@@ -14,14 +13,24 @@ interface VideoItem {
 }
 
 export function VideoDownloader() {
-  const [url, setUrl] = useState("");
+  const [urls, setUrls] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [videos, setVideos] = useState<VideoItem[]>([]);
 
   const handleUrlSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url) {
-      toast.error("Please enter a Facebook video URL");
+    if (!urls.trim()) {
+      toast.error("Please enter at least one Facebook video URL");
+      return;
+    }
+
+    const urlList = urls
+      .split('\n')
+      .map(url => url.trim())
+      .filter(url => url.length > 0);
+
+    if (urlList.length === 0) {
+      toast.error("Please enter valid Facebook video URLs");
       return;
     }
 
@@ -29,22 +38,14 @@ export function VideoDownloader() {
     try {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1500));
-      const mockVideos: VideoItem[] = [
-        {
-          id: "1",
-          title: "Sample Video 1",
-          thumbnail: "https://picsum.photos/400/225",
-          duration: "2:30",
-        },
-        {
-          id: "2",
-          title: "Sample Video 2",
-          thumbnail: "https://picsum.photos/400/225",
-          duration: "1:45",
-        },
-      ];
+      const mockVideos: VideoItem[] = urlList.map((url, index) => ({
+        id: `${index + 1}`,
+        title: `Video from URL ${index + 1}`,
+        thumbnail: "https://picsum.photos/400/225",
+        duration: "2:30",
+      }));
       setVideos(mockVideos);
-      toast.success("Videos fetched successfully");
+      toast.success(`Successfully fetched ${mockVideos.length} videos`);
     } catch (error) {
       toast.error("Failed to fetch videos");
     } finally {
@@ -60,8 +61,8 @@ export function VideoDownloader() {
     toast.success("Downloading all videos");
   };
 
-  const clearUrl = () => {
-    setUrl("");
+  const clearUrls = () => {
+    setUrls("");
   };
 
   return (
@@ -71,26 +72,28 @@ export function VideoDownloader() {
           Facebook Video Downloader
         </h1>
         <p className="mx-auto max-w-[600px] text-gray-500 md:text-lg">
-          Download multiple videos from Facebook in high quality. Just paste the URL and we'll handle the rest.
+          Download multiple videos from Facebook in high quality. Add one URL per line and we'll handle the rest.
         </p>
       </div>
 
       <form onSubmit={handleUrlSubmit} className="space-y-4">
         <div className="input-container">
-          <div className="relative flex items-center">
-            <Link className="ml-3 h-5 w-5 text-gray-400" />
-            <Input
-              type="url"
-              placeholder="Paste Facebook video URL here..."
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              className="border-0 pl-2 pr-10 focus-visible:ring-0"
+          <div className="relative">
+            <div className="absolute left-3 top-3">
+              <Link className="h-5 w-5 text-gray-400" />
+            </div>
+            <textarea
+              placeholder="Paste Facebook video URLs here (one per line)..."
+              value={urls}
+              onChange={(e) => setUrls(e.target.value)}
+              className="min-h-[120px] w-full resize-y rounded-lg border-0 bg-transparent pl-10 pr-10 focus-visible:ring-0"
+              style={{ lineHeight: '1.5' }}
             />
-            {url && (
+            {urls && (
               <button
                 type="button"
-                onClick={clearUrl}
-                className="absolute right-3 text-gray-400 hover:text-gray-600"
+                onClick={clearUrls}
+                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
               >
                 <X className="h-5 w-5" />
               </button>
