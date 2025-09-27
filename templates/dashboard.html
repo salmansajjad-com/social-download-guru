@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - YouTube to Facebook Video Poster{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+        </h2>
+    </div>
+</div>
+
+<!-- Facebook Connection Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fab fa-facebook me-2"></i>Facebook Pages
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if fb_pages %}
+                    <div class="row">
+                        {% for page in fb_pages %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card border-success">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ page.page_name }}</h6>
+                                    <p class="card-text small text-muted">Page ID: {{ page.page_id }}</p>
+                                    <span class="badge bg-success">Connected</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">No Facebook pages connected yet.</p>
+                    <a href="/auth/facebook/connect" class="btn btn-primary">
+                        <i class="fab fa-facebook me-2"></i>Connect Facebook Page
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- YouTube Video Processing Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fab fa-youtube me-2"></i>Post YouTube Video
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="videoForm">
+                    <div class="mb-3">
+                        <label for="youtubeUrl" class="form-label">YouTube URL</label>
+                        <input type="url" class="form-control" id="youtubeUrl" 
+                               placeholder="https://www.youtube.com/watch?v=..." required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-2"></i>Fetch Video Info
+                    </button>
+                </form>
+
+                <!-- Video Preview -->
+                <div id="videoPreview" class="mt-4" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <img id="videoThumbnail" class="img-fluid rounded video-preview" alt="Video thumbnail">
+                        </div>
+                        <div class="col-md-8">
+                            <h5 id="videoTitle"></h5>
+                            <p id="videoDescription" class="text-muted"></p>
+                            <p class="small">
+                                <strong>Duration:</strong> <span id="videoDuration"></span> | 
+                                <strong>Uploader:</strong> <span id="videoUploader"></span>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Quality Selection -->
+                    <div class="mt-3">
+                        <label class="form-label">Select Video Quality</label>
+                        <select id="videoQuality" class="form-select quality-selector">
+                            <option value="">Choose quality...</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Custom Title/Description -->
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="customTitle" class="form-label">Custom Title (optional)</label>
+                            <input type="text" class="form-control" id="customTitle" 
+                                   placeholder="Leave empty to use YouTube title">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="customDescription" class="form-label">Custom Description (optional)</label>
+                            <textarea class="form-control" id="customDescription" rows="2" 
+                                      placeholder="Leave empty to use YouTube description"></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Facebook Page Selection -->
+                    <div class="mt-3">
+                        <label for="fbPageSelect" class="form-label">Post to Facebook Page</label>
+                        <select id="fbPageSelect" class="form-select" required>
+                            <option value="">Select a page...</option>
+                            {% for page in fb_pages %}
+                            <option value="{{ page.id }}">{{ page.page_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <button type="button" id="postButton" class="btn btn-success" disabled>
+                            <i class="fab fa-facebook me-2"></i>Post to Facebook
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Post History -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-history me-2"></i>Post History
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="postHistory">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentVideoData = null;
+
+// Fetch video info
+document.getElementById('videoForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const url = document.getElementById('youtubeUrl').value;
+    
+    try {
+        const response = await fetchWithAuth('/youtube/fetch', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ url })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            currentVideoData = data;
+            displayVideoInfo(data);
+        } else {
+            const error = await response.json();
+            alert('Error fetching video: ' + error.detail);
+        }
+    } catch (error) {
+        alert('Error fetching video: ' + error.message);
+    }
+});
+
+function displayVideoInfo(data) {
+    document.getElementById('videoThumbnail').src = data.thumbnail;
+    document.getElementById('videoTitle').textContent = data.title;
+    document.getElementById('videoDescription').textContent = data.description.substring(0, 200) + '...';
+    document.getElementById('videoDuration').textContent = formatDuration(data.duration);
+    document.getElementById('videoUploader').textContent = data.uploader;
+    
+    // Populate quality options
+    const qualitySelect = document.getElementById('videoQuality');
+    qualitySelect.innerHTML = '<option value="">Choose quality...</option>';
+    
+    data.formats.forEach(format => {
+        const option = document.createElement('option');
+        option.value = format.format_id;
+        option.textContent = format.quality;
+        qualitySelect.appendChild(option);
+    });
+    
+    document.getElementById('videoPreview').style.display = 'block';
+}
+
+function formatDuration(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } else {
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
+}
+
+// Enable post button when quality is selected
+document.getElementById('videoQuality').addEventListener('change', function() {
+    const postButton = document.getElementById('postButton');
+    postButton.disabled = !this.value || !document.getElementById('fbPageSelect').value;
+});
+
+document.getElementById('fbPageSelect').addEventListener('change', function() {
+    const postButton = document.getElementById('postButton');
+    postButton.disabled = !this.value || !document.getElementById('videoQuality').value;
+});
+
+// Post to Facebook
+document.getElementById('postButton').addEventListener('click', async function() {
+    if (!currentVideoData) return;
+    
+    const quality = document.getElementById('videoQuality').value;
+    const fbPageId = document.getElementById('fbPageSelect').value;
+    const customTitle = document.getElementById('customTitle').value;
+    const customDescription = document.getElementById('customDescription').value;
+    
+    if (!quality || !fbPageId) {
+        alert('Please select video quality and Facebook page');
+        return;
+    }
+    
+    this.disabled = true;
+    this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Posting...';
+    
+    try {
+        const response = await fetchWithAuth('/facebook/post', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                youtube_url: currentVideoData.url,
+                youtube_title: currentVideoData.title,
+                youtube_description: currentVideoData.description,
+                youtube_thumbnail: currentVideoData.thumbnail,
+                video_quality: quality,
+                fb_page_id: parseInt(fbPageId),
+                custom_title: customTitle || null,
+                custom_description: customDescription || null
+            })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            alert('Video posted successfully!');
+            loadPostHistory();
+            // Reset form
+            document.getElementById('videoForm').reset();
+            document.getElementById('videoPreview').style.display = 'none';
+            currentVideoData = null;
+        } else {
+            const error = await response.json();
+            alert('Error posting video: ' + error.detail);
+        }
+    } catch (error) {
+        alert('Error posting video: ' + error.message);
+    } finally {
+        this.disabled = false;
+        this.innerHTML = '<i class="fab fa-facebook me-2"></i>Post to Facebook';
+    }
+});
+
+// Load post history
+async function loadPostHistory() {
+    try {
+        const response = await fetchWithAuth('/history');
+        if (response.ok) {
+            const posts = await response.json();
+            displayPostHistory(posts);
+        }
+    } catch (error) {
+        console.error('Error loading post history:', error);
+    }
+}
+
+function displayPostHistory(posts) {
+    const container = document.getElementById('postHistory');
+    
+    if (posts.length === 0) {
+        container.innerHTML = '<p class="text-muted">No posts yet.</p>';
+        return;
+    }
+    
+    container.innerHTML = posts.map(post => `
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h6 class="card-title">${post.youtube_title}</h6>
+                        <p class="card-text small text-muted">
+                            Quality: ${post.video_quality} | 
+                            Posted: ${new Date(post.created_at).toLocaleString()}
+                        </p>
+                        <p class="card-text small">
+                            <a href="${post.youtube_url}" target="_blank" class="text-danger">
+                                <i class="fab fa-youtube me-1"></i>YouTube
+                            </a>
+                            ${post.fb_post_url ? `
+                                <a href="${post.fb_post_url}" target="_blank" class="text-primary ms-3">
+                                    <i class="fab fa-facebook me-1"></i>Facebook
+                                </a>
+                            ` : ''}
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <span class="badge ${post.status === 'uploaded' ? 'bg-success' : 'bg-warning'}">
+                            ${post.status}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Load post history on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadPostHistory();
+});
+</script>
+{% endblock %}
