@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Connect Facebook Pages - YouTube to Facebook Video Poster{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0">
+                    <i class="fab fa-facebook me-2"></i>Connect Facebook Pages
+                </h3>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Select the Facebook pages you want to connect to this app:</p>
+                
+                <form id="pagesForm">
+                    <input type="hidden" id="accessToken" value="{{ access_token }}">
+                    
+                    <div class="row">
+                        {% for page in pages %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" 
+                                               value="{{ page.id }}" id="page_{{ page.id }}" 
+                                               name="pages" checked>
+                                        <label class="form-check-label" for="page_{{ page.id }}">
+                                            <strong>{{ page.name }}</strong>
+                                            <br>
+                                            <small class="text-muted">Page ID: {{ page.id }}</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fab fa-facebook me-2"></i>Connect Selected Pages
+                        </button>
+                        <a href="/dashboard" class="btn btn-outline-secondary ms-2">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('pagesForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const selectedPages = Array.from(document.querySelectorAll('input[name="pages"]:checked'))
+        .map(checkbox => {
+            const pageId = checkbox.value;
+            const pageName = checkbox.nextElementSibling.querySelector('strong').textContent;
+            return {
+                id: pageId,
+                name: pageName,
+                access_token: document.getElementById('accessToken').value
+            };
+        });
+    
+    if (selectedPages.length === 0) {
+        alert('Please select at least one page');
+        return;
+    }
+    
+    try {
+        const response = await fetchWithAuth('/facebook/save-pages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                pages: selectedPages,
+                access_token: document.getElementById('accessToken').value
+            })
+        });
+        
+        if (response.ok) {
+            alert('Pages connected successfully!');
+            window.location.href = '/dashboard';
+        } else {
+            const error = await response.json();
+            alert('Error connecting pages: ' + error.detail);
+        }
+    } catch (error) {
+        alert('Error connecting pages: ' + error.message);
+    }
+});
+</script>
+{% endblock %}
